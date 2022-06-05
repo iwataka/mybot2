@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"sync"
 
@@ -26,11 +28,13 @@ const (
 var (
 	twitterToken = kingpin.Flag("twitter-token", "Twitter bearer token").Envar("MYBOT_TWITTER_TOKEN").Required().String()
 	slackToken   = kingpin.Flag("slack-token", "Slack bearer token").Envar("MYBOT_SLACK_TOKEN").Required().String()
-	configFile = kingpin.Flag("config", "Config file").Default("config.yaml").File()
+	configFile   = kingpin.Flag("config", "Config file").Envar("MYBOT_CONFIG").Default("config.yaml").File()
 )
 
 func main() {
 	kingpin.Parse()
+
+	log.SetFlags(log.LstdFlags)
 
 	ctx := Context{
 		context:       context.Background(),
@@ -60,10 +64,17 @@ func main() {
 				if !ok {
 					return
 				}
+				bs, err := json.Marshal(out)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				log.Println(string(bs))
 				for _, proc := range config.Process {
 					match, err := proc.Filter.Match(out)
 					if err != nil {
 						errChan <- err
+						return
 					}
 					if match {
 						proc.Action.Do(ctx, out)
